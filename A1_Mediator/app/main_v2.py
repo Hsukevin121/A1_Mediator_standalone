@@ -137,6 +137,34 @@ async def create_policy_instance(policy_type_id: int, policy_instance_id: str, b
     finally:
         if conn: conn.close()
 
+@app.get("/a1-p/policytypes/{policy_type_id}/policies", response_model=list[str])
+async def list_policy_instances(policy_type_id: int):
+    if policy_type_id not in policy_instances:
+        raise HTTPException(status_code=404, detail="Policy type does not exist")
+    return list(policy_instances[policy_type_id].keys())
+
+@app.delete("/a1-p/policytypes/{policy_type_id}/policies/{policy_instance_id}")
+async def delete_policy_instance(policy_type_id: int, policy_instance_id: str):
+    if policy_type_id not in policy_instances or policy_instance_id not in policy_instances[policy_type_id]:
+        raise HTTPException(status_code=404, detail="Policy instance not found")
+    del policy_instances[policy_type_id][policy_instance_id]
+    return {"detail": "Policy instance successfully deleted"}
+
+@app.delete("/a1-p/policytypes/{policy_type_id}")
+async def delete_policy_type(policy_type_id: int):
+    try:
+        conn = pymysql.connect(**DB_CONFIG)
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM policy_types WHERE policy_type_id = %s", (policy_type_id,))
+            conn.commit()
+            if policy_type_id in policy_instances:
+                del policy_instances[policy_type_id]
+        return {"detail": "Policy type and instances deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
 @app.get("/lookup/{policy_type_id}")
 async def lookup_app(policy_type_id: int):
     try:
